@@ -1,6 +1,9 @@
+// Main script that generates and renders the 3D globe
+
 
 console.log("Setting things up...");
 
+// Parameters controlling globe generation
 var globe = {
     radius: 1,
     heightScale: 0.05,
@@ -14,6 +17,7 @@ var globe = {
     iceCapTransitionRange: 0.05
 };
 
+// Canvas used for main WebGL rendering
 var canvas = document.getElementById("main");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
@@ -21,6 +25,7 @@ canvas.style.left = "0px";
 canvas.style.top = "0px";
 canvas.style.position = "absolute";
 
+// Offscreen canvas for land texture generation
 var landColor = document.getElementById("aux");
 var ctxLand = landColor.getContext("2d");
 landColor.width = globe.gLongitudeRes;
@@ -30,6 +35,7 @@ landColor.style.top = "0px";
 landColor.style.position = "absolute";
 landColor.style.width = globe.gLongitudeRes + "px";
 landColor.style.height = globe.gLatitudeRes + "px";
+// Canvas for 2D GUI overlays
 
 var gui = document.getElementById("gui");
 var ctx = gui.getContext("2d");
@@ -41,6 +47,7 @@ gui.style.position = "absolute";
 gui.style.width = gui.width;
 gui.style.height = gui.height;
 
+// Scene to render GUI elements onto the 2D canvas
 var guiCamera = new THREE.OrthographicCamera(-gui.width/2, gui.width/2, gui.height/2, -gui.height/2, 0, 30);
 var guiScene = new THREE.Scene();
 var guiTexture = new THREE.CanvasTexture(gui);
@@ -56,9 +63,11 @@ guiScene.add(guiPlane);
 guiScene.add(new THREE.AxesHelper());
 
 
+// Main 3D scene setup
 var scene = new THREE.Scene();
 var camera = new THREE.PerspectiveCamera(70, canvas.width / canvas.height, 0.1, 1000);
 
+// Renderer for drawing the 3D scene
 var renderer = new THREE.WebGLRenderer({canvas: canvas, antialias: false});
 renderer.setSize(canvas.width, canvas.height);
 renderer.autoClear = false;
@@ -79,6 +88,7 @@ var mouse = {
 	y: 0
 };
 
+// Track mouse movement for camera rotation
 window.addEventListener("mousemove", 
 	function(event) {
 		mouse.x = event.x;
@@ -86,6 +96,7 @@ window.addEventListener("mousemove",
 	}
 );
 
+// Handle keyboard input (unused but kept for future features)
 window.addEventListener("keydown", 
 	function(event) {
 		keys[event.which || event.keyCode] = true;
@@ -100,6 +111,7 @@ window.addEventListener("keyup",
 var keys = [];
 
 
+// Adjust canvas sizes when the window changes
 window.addEventListener("resize", 
 	function() {
 		canvas.width = window.innerWidth;
@@ -111,7 +123,9 @@ window.addEventListener("resize",
 
 console.log("Setup done!");
 
+// Seed the noise function for terrain generation
 noise.seed(Math.random());
+// Initialize height array
 
 for (var a = 0; a < globe.longitudeRes; a++) {
     globe.points[a] = [];
@@ -119,6 +133,7 @@ for (var a = 0; a < globe.longitudeRes; a++) {
         globe.points[a][b] = 0;
     }
 }
+// Camera settings
 
 var cam = {
     dx: 0,
@@ -137,6 +152,7 @@ for (var a = 0; a < reps; a++) {
     capSeed[1][a] = (2 * Math.random() - 1) * 65536;
 }
 
+// Generate altitude and biome for a point on the sphere
 function getAlt (dx, dy) {
     var alt = 0;
     var capLat1 = globe.iceCapLatitude;
@@ -179,6 +195,7 @@ ocean.material.opacity = 0.8;
 ocean.position.copy({x: 0, y: 0, z: 0});
 scene.add(ocean);
 
+// Generate vertex data for the terrain mesh
 console.log("Generating landscape...");
 
 var landPoints = [];
@@ -200,6 +217,7 @@ for (var a = 0; a < globe.longitudeRes; a++) {
     }
 }
 
+// Connect vertices into triangular faces
 console.log("Plotting triangles...");
 
 var facesIndex = [];
@@ -245,6 +263,7 @@ for (var a = 0; a < globe.longitudeRes; a++) {
     }
 }
 
+// Create a color map for land textures
 console.log("Coloring landscape...");
 
 var colorMapPoints = [
@@ -310,6 +329,7 @@ for (var a = 0; a < globe.gLongitudeRes; a++) {
 land.material.map.needsUpdate = true;
 
 
+// Main render loop
 function draw() {
     requestAnimationFrame(draw);
 
@@ -323,6 +343,7 @@ function draw() {
     land.rotation.y += 0.0005;
     ocean.rotation.y += 0.0005;
 
+// Update camera rotation based on mouse movement
     
 	cam.dy = -(mouse.y / innerHeight - 0.5) * Math.PI;
     cam.dx = -mouse.x / innerWidth * Math.PI * 4;
@@ -342,8 +363,10 @@ function draw() {
 
 draw();
 
+// Start the animation
 console.log("Loading done!");
 
+// Utility function to inspect max altitude (for debugging)
 function getMaxAlt () {
     var max = 0;
     for (var a = 0; a < globe.points.length; a++) {

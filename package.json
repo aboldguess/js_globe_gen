@@ -1,0 +1,12 @@
+{
+  "name": "js_globe_gen",
+  "version": "1.0.0",
+  "description": "Procedurally generated globe model",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
