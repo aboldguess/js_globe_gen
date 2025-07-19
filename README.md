@@ -17,5 +17,5 @@ This starts a local server at `http://localhost:3000` that serves the project fi
 
 ## Controls
 
-- **Rotate:** click and drag the mouse on the canvas.
-- **Zoom:** use the mouse wheel to zoom the camera in and out.
+ - **Rotate:** click and drag (or touch and drag) the canvas.
+ - **Zoom:** use the mouse wheel to zoom the camera in and out.
