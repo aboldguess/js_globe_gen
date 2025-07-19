@@ -93,21 +93,22 @@ scene.add(light);
 var ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(ambientLight);
 
-// Track current mouse position
+// Track current pointer position
 var mouse = { x: 0, y: 0 };
 // Flags for click-and-drag camera control
 var isDragging = false;
 var dragStart = { x: 0, y: 0 };
 
-// Start dragging when the user presses the mouse button on the canvas
-canvas.addEventListener("mousedown", function(event) {
+// Start dragging when the user presses on the canvas
+canvas.addEventListener("pointerdown", function(event) {
     isDragging = true;
     dragStart.x = event.clientX;
     dragStart.y = event.clientY;
+    canvas.setPointerCapture(event.pointerId);
 });
 
-// Rotate camera while dragging the mouse
-window.addEventListener("mousemove", function(event) {
+// Rotate camera while dragging the pointer
+canvas.addEventListener("pointermove", function(event) {
     mouse.x = event.clientX;
     mouse.y = event.clientY;
     if (isDragging) {
@@ -121,9 +122,10 @@ window.addEventListener("mousemove", function(event) {
     }
 });
 
-// Stop dragging on mouse release
-window.addEventListener("mouseup", function() {
+// Stop dragging when the pointer is released
+canvas.addEventListener("pointerup", function(event) {
     isDragging = false;
+    canvas.releasePointerCapture(event.pointerId);
 });
 
 // Zoom in/out with the mouse wheel
