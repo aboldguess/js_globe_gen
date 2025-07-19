@@ -30,6 +30,12 @@
 </head>
 <body>
         <div id="settingsOverlay">
+                <label>World Radius <input type="number" id="worldRadius" min="0.5" max="5" step="0.1" value="1"></label>
+                <label>Latitude Resolution <input type="number" id="latRes" min="16" max="512" step="16" value="256"></label>
+                <label>Longitude Resolution <input type="number" id="lonRes" min="16" max="512" step="16" value="256"></label>
+                <label>Texture Latitude Res <input type="number" id="texLatRes" min="128" max="2048" step="128" value="1024"></label>
+                <label>Texture Longitude Res <input type="number" id="texLonRes" min="128" max="2048" step="128" value="1024"></label>
+                <label>Noise Seed <input type="number" id="noiseSeed" min="0" max="65535" step="1" value="1"></label>
                 <label>Height Scale <input type="range" id="heightScale" min="0" max="0.2" step="0.01" value="0.05"></label>
                 <label>Ice Cap Latitude <input type="range" id="iceCapLat" min="0" max="1" step="0.05" value="0.75"></label>
                 <label>Ice Cap Level <input type="range" id="iceCapLvl" min="0" max="0.1" step="0.005" value="0.025"></label>

@@ -5,15 +5,24 @@ console.log("Setting things up...");
 
 // Parameters controlling globe generation
 var globe = {
+    // Radius of the sphere in scene units
     radius: 1,
+    // Multiplier controlling how tall mountains appear
     heightScale: 0.05,
+    // Geometry resolution along latitude and longitude
     latitudeRes: 256,
     longitudeRes: 256,
+    // Resolution of the texture applied to the sphere
     gLatitudeRes: 1024,
     gLongitudeRes: 1024,
+    // Seed value used for deterministic terrain generation
+    noiseSeed: 1,
     points: [],
+    // Latitude at which polar ice caps begin
     iceCapLatitude: 0.75,
+    // Maximum ice cap thickness relative to radius
     iceCapLevel: 0.025,
+    // Range over which the ice cap transitions into terrain
     iceCapTransitionRange: 0.05
 };
 
@@ -28,6 +37,7 @@ canvas.style.position = "absolute";
 // Offscreen canvas for land texture generation
 var landColor = document.getElementById("aux");
 var ctxLand = landColor.getContext("2d");
+// Initial texture size; values may change when the globe is regenerated
 landColor.width = globe.gLongitudeRes;
 landColor.height = globe.gLatitudeRes;
 landColor.style.left = "0px";
@@ -123,8 +133,38 @@ window.addEventListener("resize",
 
 console.log("Setup done!");
 
-// Seed the noise function for terrain generation
-noise.seed(Math.random());
+// ---------------------------------------------
+// Noise seeding utilities
+// ---------------------------------------------
+
+// Simple deterministic RNG used to generate additional seed values
+function mulberry32(a) {
+    return function() {
+        var t = a += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+}
+
+var reps = 7; // Number of noise layers used when generating terrain
+var seed = [];
+var capSeed = [[], []];
+
+// Initialize the noise library and seed arrays from a numeric seed value
+function initializeNoiseSeeds(seedValue) {
+    noise.seed(seedValue);
+    var rng = mulberry32(seedValue);
+    for (var a = 0; a < reps; a++) {
+        seed[a] = (2 * rng() - 1) * 65536;
+        capSeed[0][a] = (2 * rng() - 1) * 65536;
+        capSeed[1][a] = (2 * rng() - 1) * 65536;
+    }
+}
+
+// Perform initial seeding
+initializeNoiseSeeds(globe.noiseSeed);
+
 // Initialize height array
 
 for (var a = 0; a < globe.longitudeRes; a++) {
@@ -147,14 +187,6 @@ var cam = {
 var ocean = null;
 var land = null;
 
-var reps = 7;
-var seed = [];
-var capSeed = [[], []];
-for (var a = 0; a < reps; a++) {
-    seed[a] = (2 * Math.random() - 1) * 65536;
-    capSeed[0][a] = (2 * Math.random() - 1) * 65536;
-    capSeed[1][a] = (2 * Math.random() - 1) * 65536;
-}
 
 // Generate altitude and biome for a point on the sphere
 function getAlt (dx, dy) {
@@ -195,6 +227,12 @@ function getAlt (dx, dy) {
 
 // Generate the globe geometry and textures based on current parameters
 function generateGlobe() {
+    // Update offscreen canvas size to match texture resolution
+    landColor.width = globe.gLongitudeRes;
+    landColor.height = globe.gLatitudeRes;
+    landColor.style.width = globe.gLongitudeRes + "px";
+    landColor.style.height = globe.gLatitudeRes + "px";
+
     // Remove previous meshes if they exist
     if (land) {
         scene.remove(land);
@@ -359,10 +397,22 @@ generateGlobe();
 
 // Rebuild the globe when the user clicks the Update button
 document.getElementById('applySettings').addEventListener('click', function() {
+    // Read updated parameters from the overlay inputs
+    globe.radius = parseFloat(document.getElementById('worldRadius').value);
+    globe.latitudeRes = parseInt(document.getElementById('latRes').value, 10);
+    globe.longitudeRes = parseInt(document.getElementById('lonRes').value, 10);
+    globe.gLatitudeRes = parseInt(document.getElementById('texLatRes').value, 10);
+    globe.gLongitudeRes = parseInt(document.getElementById('texLonRes').value, 10);
+    globe.noiseSeed = parseInt(document.getElementById('noiseSeed').value, 10);
     globe.heightScale = parseFloat(document.getElementById('heightScale').value);
     globe.iceCapLatitude = parseFloat(document.getElementById('iceCapLat').value);
     globe.iceCapLevel = parseFloat(document.getElementById('iceCapLvl').value);
     globe.iceCapTransitionRange = parseFloat(document.getElementById('iceCapRange').value);
+    // Camera distance scales with world radius
+    cam.distance = globe.radius * 3;
+    // Re-seed noise for deterministic generation
+    initializeNoiseSeeds(globe.noiseSeed);
+    // Recreate meshes and textures using the new parameters
     generateGlobe();
 });
 
