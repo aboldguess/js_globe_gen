@@ -14,3 +14,8 @@ npm start
 ```
 
 This starts a local server at `http://localhost:3000` that serves the project files. Open that URL in your browser to view the globe.
+
+## Controls
+
+- **Rotate:** click and drag the mouse on the canvas.
+- **Zoom:** use the mouse wheel to zoom the camera in and out.

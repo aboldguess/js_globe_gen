@@ -93,18 +93,46 @@ scene.add(light);
 var ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(ambientLight);
 
-var mouse = {
-	x: 0,
-	y: 0
-};
+// Track current mouse position
+var mouse = { x: 0, y: 0 };
+// Flags for click-and-drag camera control
+var isDragging = false;
+var dragStart = { x: 0, y: 0 };
 
-// Track mouse movement for camera rotation
-window.addEventListener("mousemove", 
-	function(event) {
-		mouse.x = event.x;
-		mouse.y = event.y;
-	}
-);
+// Start dragging when the user presses the mouse button on the canvas
+canvas.addEventListener("mousedown", function(event) {
+    isDragging = true;
+    dragStart.x = event.clientX;
+    dragStart.y = event.clientY;
+});
+
+// Rotate camera while dragging the mouse
+window.addEventListener("mousemove", function(event) {
+    mouse.x = event.clientX;
+    mouse.y = event.clientY;
+    if (isDragging) {
+        var deltaX = event.clientX - dragStart.x;
+        var deltaY = event.clientY - dragStart.y;
+        // Horizontal drag rotates around the Y axis, vertical drag around X
+        cam.dx -= (deltaX / canvas.clientWidth) * Math.PI;
+        cam.dy -= (deltaY / canvas.clientHeight) * Math.PI;
+        dragStart.x = event.clientX;
+        dragStart.y = event.clientY;
+    }
+});
+
+// Stop dragging on mouse release
+window.addEventListener("mouseup", function() {
+    isDragging = false;
+});
+
+// Zoom in/out with the mouse wheel
+canvas.addEventListener("wheel", function(event) {
+    event.preventDefault();
+    cam.distance += event.deltaY * 0.01;
+    // Clamp zoom so the camera doesn't get too close or too far
+    cam.distance = Math.min(Math.max(cam.distance, globe.radius * 1.5), globe.radius * 10);
+});
 
 // Handle keyboard input (unused but kept for future features)
 window.addEventListener("keydown", 
@@ -431,14 +459,10 @@ function draw() {
     land.rotation.y += 0.0005;
     ocean.rotation.y += 0.0005;
 
-// Update camera rotation based on mouse movement
-    
-	cam.dy = -(mouse.y / innerHeight - 0.5) * Math.PI;
-    cam.dx = -mouse.x / innerWidth * Math.PI * 4;
-    
-	cam.rotation.w = Math.cos(cam.dx / 2) * Math.cos(cam.dy / 2);
-	cam.rotation.z = -Math.sin(cam.dx / 2) * Math.sin(cam.dy / 2);
-	cam.rotation.x = Math.cos(cam.dx / 2) * Math.sin(cam.dy / 2);
+    // Convert the current camera angles into a quaternion for Three.js
+    cam.rotation.w = Math.cos(cam.dx / 2) * Math.cos(cam.dy / 2);
+    cam.rotation.z = -Math.sin(cam.dx / 2) * Math.sin(cam.dy / 2);
+    cam.rotation.x = Math.cos(cam.dx / 2) * Math.sin(cam.dy / 2);
     cam.rotation.y = Math.sin(cam.dx / 2) * Math.cos(cam.dy / 2);
     
 
