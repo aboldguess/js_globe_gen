@@ -170,9 +170,22 @@ window.addEventListener("keyup",
 
 // When pointer lock is lost, exit first person mode
 document.addEventListener("pointerlockchange", function() {
+    // If the pointer lock was lost while in first person mode,
+    // fall back to the orbit camera and update the checkbox state.
     if (firstPerson && document.pointerLockElement !== canvas) {
         firstPerson = false;
         document.getElementById("firstPersonToggle").checked = false;
+    }
+});
+
+// Some browsers may deny the pointer lock request (for example when running
+// the page from the local filesystem). In that case we disable first person
+// mode again so the user is not stuck in a broken state.
+document.addEventListener("pointerlockerror", function() {
+    if (firstPerson) {
+        firstPerson = false;
+        document.getElementById("firstPersonToggle").checked = false;
+        console.warn("Pointer lock failed; first person view disabled.");
     }
 });
 
