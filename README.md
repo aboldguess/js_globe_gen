@@ -25,3 +25,4 @@ pass the desired port as a command line argument. See
  - **Zoom:** use the mouse wheel to zoom the camera in and out.
 - **First Person:** enable the "First Person View" checkbox to walk on the globe. Use WASD to move and the mouse to look around.
 - **Head Height:** adjust the "Head Height" input in the settings panel to control how high the camera sits above the ground when in first person view.
+ - *First Person Note:* browsers only grant pointer lock (needed for looking around) when served from a web server. If you open `index.html` directly from your filesystem, the checkbox may not work.
