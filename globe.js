@@ -101,6 +101,9 @@ var dragStart = { x: 0, y: 0 };
 
 // Start dragging when the user presses on the canvas
 canvas.addEventListener("pointerdown", function(event) {
+    if (firstPerson) {
+        return; // pointer lock handles movement in first person mode
+    }
     isDragging = true;
     dragStart.x = event.clientX;
     dragStart.y = event.clientY;
@@ -111,7 +114,13 @@ canvas.addEventListener("pointerdown", function(event) {
 canvas.addEventListener("pointermove", function(event) {
     mouse.x = event.clientX;
     mouse.y = event.clientY;
-    if (isDragging) {
+    if (firstPerson && document.pointerLockElement === canvas) {
+        // Update yaw/pitch while pointer is locked
+        player.yaw -= event.movementX * 0.002;
+        player.pitch -= event.movementY * 0.002;
+        // Limit looking too far up or down
+        player.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, player.pitch));
+    } else if (isDragging) {
         var deltaX = event.clientX - dragStart.x;
         var deltaY = event.clientY - dragStart.y;
         // Horizontal drag rotates around the Y axis, vertical drag around X
@@ -124,16 +133,27 @@ canvas.addEventListener("pointermove", function(event) {
 
 // Stop dragging when the pointer is released
 canvas.addEventListener("pointerup", function(event) {
-    isDragging = false;
-    canvas.releasePointerCapture(event.pointerId);
+    if (!firstPerson) {
+        isDragging = false;
+        canvas.releasePointerCapture(event.pointerId);
+    }
+});
+
+// Request pointer lock on click when first person mode is active
+canvas.addEventListener("click", function() {
+    if (firstPerson && document.pointerLockElement !== canvas) {
+        canvas.requestPointerLock();
+    }
 });
 
 // Zoom in/out with the mouse wheel
 canvas.addEventListener("wheel", function(event) {
-    event.preventDefault();
-    cam.distance += event.deltaY * 0.01;
-    // Clamp zoom so the camera doesn't get too close or too far
-    cam.distance = Math.min(Math.max(cam.distance, globe.radius * 1.5), globe.radius * 10);
+    if (!firstPerson) {
+        event.preventDefault();
+        cam.distance += event.deltaY * 0.01;
+        // Clamp zoom so the camera doesn't get too close or too far
+        cam.distance = Math.min(Math.max(cam.distance, globe.radius * 1.5), globe.radius * 10);
+    }
 });
 
 // Handle keyboard input (unused but kept for future features)
@@ -142,11 +162,19 @@ window.addEventListener("keydown",
 		keys[event.which || event.keyCode] = true;
 	}
 );
-window.addEventListener("keyup", 
-	function(event) {
-		keys[event.which || event.keyCode] = false;
-	}
+window.addEventListener("keyup",
+        function(event) {
+                keys[event.which || event.keyCode] = false;
+        }
 );
+
+// When pointer lock is lost, exit first person mode
+document.addEventListener("pointerlockchange", function() {
+    if (firstPerson && document.pointerLockElement !== canvas) {
+        firstPerson = false;
+        document.getElementById("firstPersonToggle").checked = false;
+    }
+});
 
 var keys = [];
 
@@ -211,6 +239,15 @@ var cam = {
     dz: 0,
     distance: globe.radius * 3,
     rotation: new THREE.Quaternion(0, 0, 0, 0)
+};
+
+// Toggle for switching between orbit and first person camera modes
+var firstPerson = false;
+// Stores player orientation and position when in first person mode
+var player = {
+    position: new THREE.Vector3(),
+    yaw: 0,
+    pitch: 0
 };
 
 // Meshes for the ocean and terrain. These are recreated when settings change.
@@ -446,6 +483,24 @@ document.getElementById('applySettings').addEventListener('click', function() {
     generateGlobe();
 });
 
+// Toggle first person mode when the checkbox changes
+document.getElementById('firstPersonToggle').addEventListener('change', function() {
+    firstPerson = this.checked;
+    if (firstPerson) {
+        // Initialize player position based on current orbit camera angles
+        var alt = getAlt(cam.dx, -cam.dy).alt;
+        var r = globe.radius * (1 + globe.heightScale * alt) + 0.02;
+        player.position.set(r * Math.sin(cam.dx) * Math.cos(-cam.dy),
+                            -r * Math.sin(-cam.dy),
+                            r * Math.cos(cam.dx) * Math.cos(-cam.dy));
+        player.yaw = cam.dx;
+        player.pitch = -cam.dy;
+        canvas.requestPointerLock();
+    } else {
+        document.exitPointerLock();
+    }
+});
+
 
 // Main render loop
 function draw() {
@@ -461,15 +516,45 @@ function draw() {
     land.rotation.y += 0.0005;
     ocean.rotation.y += 0.0005;
 
-    // Convert the current camera angles into a quaternion for Three.js
-    cam.rotation.w = Math.cos(cam.dx / 2) * Math.cos(cam.dy / 2);
-    cam.rotation.z = -Math.sin(cam.dx / 2) * Math.sin(cam.dy / 2);
-    cam.rotation.x = Math.cos(cam.dx / 2) * Math.sin(cam.dy / 2);
-    cam.rotation.y = Math.sin(cam.dx / 2) * Math.cos(cam.dy / 2);
-    
+    if (firstPerson) {
+        // Direction the player is facing in world space
+        var forward = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ'));
+        var up = player.position.clone().normalize();
+        // Project forward vector onto tangent plane
+        forward.addScaledVector(up, -forward.dot(up));
+        forward.normalize();
+        var right = new THREE.Vector3().crossVectors(forward, up).normalize();
 
-    camera.setRotationFromQuaternion(cam.rotation);
-    camera.position.set(cam.distance * Math.sin(cam.dx) * Math.cos(cam.dy), -cam.distance * Math.sin(cam.dy), cam.distance * Math.cos(cam.dx) * Math.cos(cam.dy));
+        var speed = 0.01 * globe.radius;
+        if (keys[87]) player.position.addScaledVector(forward, speed); // W
+        if (keys[83]) player.position.addScaledVector(forward, -speed); // S
+        if (keys[65]) player.position.addScaledVector(right, -speed); // A
+        if (keys[68]) player.position.addScaledVector(right, speed); // D
+
+        // Keep the player on the surface based on terrain altitude
+        var lon = Math.atan2(player.position.z, player.position.x);
+        var lat = Math.asin(player.position.y / player.position.length());
+        var alt = getAlt(lon, lat).alt;
+        var r = globe.radius * (1 + globe.heightScale * alt) + 0.02;
+        player.position.setLength(r);
+
+        camera.position.copy(player.position);
+        camera.up.copy(up);
+        camera.lookAt(player.position.clone().add(forward));
+    } else {
+        // Convert the current camera angles into a quaternion for Three.js
+        cam.rotation.w = Math.cos(cam.dx / 2) * Math.cos(cam.dy / 2);
+        cam.rotation.z = -Math.sin(cam.dx / 2) * Math.sin(cam.dy / 2);
+        cam.rotation.x = Math.cos(cam.dx / 2) * Math.sin(cam.dy / 2);
+        cam.rotation.y = Math.sin(cam.dx / 2) * Math.cos(cam.dy / 2);
+
+        camera.setRotationFromQuaternion(cam.rotation);
+        camera.position.set(
+            cam.distance * Math.sin(cam.dx) * Math.cos(cam.dy),
+            -cam.distance * Math.sin(cam.dy),
+            cam.distance * Math.cos(cam.dx) * Math.cos(cam.dy)
+        );
+    }
 
     renderer.render(scene, camera);
     renderer.render(guiScene, guiCamera);
