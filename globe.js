@@ -143,6 +143,10 @@ var cam = {
     rotation: new THREE.Quaternion(0, 0, 0, 0)
 };
 
+// Meshes for the ocean and terrain. These are recreated when settings change.
+var ocean = null;
+var land = null;
+
 var reps = 7;
 var seed = [];
 var capSeed = [[], []];
@@ -189,144 +193,178 @@ function getAlt (dx, dy) {
     return {alt: alt, biome: biome};
 };
 
-var ocean = new THREE.Mesh(new THREE.SphereGeometry(globe.radius, globe.latitudeRes, globe.longitudeRes), new THREE.MeshStandardMaterial({color: 0x1f7fef, side: THREE.DoubleSide}));
-ocean.material.transparent = true;
-ocean.material.opacity = 0.8;
-ocean.position.copy({x: 0, y: 0, z: 0});
-scene.add(ocean);
-
-// Generate vertex data for the terrain mesh
-console.log("Generating landscape...");
-
-var landPoints = [];
-var index = [];
-for (var a = 0; a < globe.longitudeRes; a++) {
-    globe.points[a] = [];
-    index[a] = [];
-    for (var b = 0; b <= globe.latitudeRes; b++) {
-        var angleA = (a / globe.longitudeRes * 2 - 1) * Math.PI;
-        var angleB = (b / globe.latitudeRes - 0.5) * Math.PI;
-
-        var alt = getAlt(angleA, angleB).alt;
-
-        globe.points[a][b] = alt;
-        index[a][b] = landPoints.length / 3;
-        landPoints.push(globe.radius * (1 + globe.heightScale * alt) * Math.cos(angleA) * Math.cos(angleB));
-        landPoints.push(globe.radius * (1 + globe.heightScale * alt) * Math.sin(angleB));
-        landPoints.push(globe.radius * (1 + globe.heightScale * alt) * Math.sin(angleA) * Math.cos(angleB));
+// Generate the globe geometry and textures based on current parameters
+function generateGlobe() {
+    // Remove previous meshes if they exist
+    if (land) {
+        scene.remove(land);
+        land.geometry.dispose();
+        land.material.map.dispose();
+        land.material.dispose();
     }
-}
+    if (ocean) {
+        scene.remove(ocean);
+        ocean.geometry.dispose();
+        ocean.material.dispose();
+    }
 
-// Connect vertices into triangular faces
-console.log("Plotting triangles...");
+    // Create the ocean mesh
+    ocean = new THREE.Mesh(
+        new THREE.SphereGeometry(globe.radius, globe.latitudeRes, globe.longitudeRes),
+        new THREE.MeshStandardMaterial({color: 0x1f7fef, side: THREE.DoubleSide})
+    );
+    ocean.material.transparent = true;
+    ocean.material.opacity = 0.8;
+    ocean.position.copy({x: 0, y: 0, z: 0});
+    scene.add(ocean);
 
-var facesIndex = [];
-for (var a = 0; a < globe.longitudeRes; a++) {
-    for (var b = 0; b < globe.latitudeRes; b++) {
-        if (a === globe.longitudeRes - 1) {
-            if (Math.random() < 0.5) {
-                facesIndex.push(index[a][b]);
-                facesIndex.push(index[a][b+1]);
-                facesIndex.push(index[0][b]);
+    // Generate vertex positions for the terrain
+    console.log("Generating landscape...");
+    var landPoints = [];
+    var index = [];
+    for (var a = 0; a < globe.longitudeRes; a++) {
+        globe.points[a] = [];
+        index[a] = [];
+        for (var b = 0; b <= globe.latitudeRes; b++) {
+            var angleA = (a / globe.longitudeRes * 2 - 1) * Math.PI;
+            var angleB = (b / globe.latitudeRes - 0.5) * Math.PI;
 
-                facesIndex.push(index[0][b+1]);
-                facesIndex.push(index[0][b]);
-                facesIndex.push(index[a][b+1]);
+            var alt = getAlt(angleA, angleB).alt;
+
+            globe.points[a][b] = alt;
+            index[a][b] = landPoints.length / 3;
+            landPoints.push(globe.radius * (1 + globe.heightScale * alt) * Math.cos(angleA) * Math.cos(angleB));
+            landPoints.push(globe.radius * (1 + globe.heightScale * alt) * Math.sin(angleB));
+            landPoints.push(globe.radius * (1 + globe.heightScale * alt) * Math.sin(angleA) * Math.cos(angleB));
+        }
+    }
+
+    // Connect vertices into triangular faces
+    console.log("Plotting triangles...");
+    var facesIndex = [];
+    for (var a = 0; a < globe.longitudeRes; a++) {
+        for (var b = 0; b < globe.latitudeRes; b++) {
+            if (a === globe.longitudeRes - 1) {
+                if (Math.random() < 0.5) {
+                    facesIndex.push(index[a][b]);
+                    facesIndex.push(index[a][b+1]);
+                    facesIndex.push(index[0][b]);
+
+                    facesIndex.push(index[0][b+1]);
+                    facesIndex.push(index[0][b]);
+                    facesIndex.push(index[a][b+1]);
+                } else {
+                    facesIndex.push(index[a][b]);
+                    facesIndex.push(index[a][b+1]);
+                    facesIndex.push(index[0][b+1]);
+
+                    facesIndex.push(index[0][b+1]);
+                    facesIndex.push(index[0][b]);
+                    facesIndex.push(index[a][b]);
+                }
             } else {
-                facesIndex.push(index[a][b]);
-                facesIndex.push(index[a][b+1]);
-                facesIndex.push(index[0][b+1]);
+                if (Math.random < 0.5) {
+                    facesIndex.push(index[a][b]);
+                    facesIndex.push(index[a][b+1]);
+                    facesIndex.push(index[a+1][b]);
 
-                facesIndex.push(index[0][b+1]);
-                facesIndex.push(index[0][b]);
-                facesIndex.push(index[a][b]);
-            }
-        } else {
-            if (Math.random < 0.5) {
-                facesIndex.push(index[a][b]);
-                facesIndex.push(index[a][b+1]);
-                facesIndex.push(index[a+1][b]);
+                    facesIndex.push(index[a+1][b+1]);
+                    facesIndex.push(index[a+1][b]);
+                    facesIndex.push(index[a][b+1]);
+                } else {
+                    facesIndex.push(index[a][b]);
+                    facesIndex.push(index[a][b+1]);
+                    facesIndex.push(index[a+1][b+1]);
 
-                facesIndex.push(index[a+1][b+1]);
-                facesIndex.push(index[a+1][b]);
-                facesIndex.push(index[a][b+1]);
-            } else {
-                facesIndex.push(index[a][b]);
-                facesIndex.push(index[a][b+1]);
-                facesIndex.push(index[a+1][b+1]);
-
-                facesIndex.push(index[a+1][b+1]);
-                facesIndex.push(index[a+1][b]);
-                facesIndex.push(index[a][b]);
+                    facesIndex.push(index[a+1][b+1]);
+                    facesIndex.push(index[a+1][b]);
+                    facesIndex.push(index[a][b]);
+                }
             }
         }
     }
+
+    // Create a colour map and paint the land texture
+    console.log("Coloring landscape...");
+    var colorMapPoints = [
+        {p: -1, r: 140, g: 140, b: 140},
+        {p: -0.4, r: 140, g: 140, b: 140},
+        {p: 0, r: 177, g: 180, b: 117},
+        {p: 0.05, r: 77, g: 223, b: 90},
+        {p: 0.3, r: 63, g: 191, b: 71},
+        {p: 0.4, r: 170, g: 170, b: 170},
+        {p: 0.45, r: 255, g: 255, b: 255},
+        {p: 1, r: 255, g: 255, b: 255}
+    ];
+
+    function lerp(min, max, t, mode) {
+        if (mode === "CUBIC") {
+            t = -2 * t * t * t + 3 * t * t;
+        } else if (mode === "SINE") {
+            t = (1 - Math.cos(t * Math.PI)) / 2;
+        }
+        return min + t * (max - min);
+    }
+
+    function colorMap(t) {
+        var c = {r: 0, g: 0, b: 0};
+        for (var a = 0; a < colorMapPoints.length - 1; a++) {
+            if (t >= colorMapPoints[a].p && t < colorMapPoints[a + 1].p) {
+                c = {
+                    r: lerp(colorMapPoints[a].r, colorMapPoints[a + 1].r, (t - colorMapPoints[a].p) / (colorMapPoints[a + 1].p - colorMapPoints[a].p), "CUBIC"),
+                    g: lerp(colorMapPoints[a].g, colorMapPoints[a + 1].g, (t - colorMapPoints[a].p) / (colorMapPoints[a + 1].p - colorMapPoints[a].p), "CUBIC"),
+                    b: lerp(colorMapPoints[a].b, colorMapPoints[a + 1].b, (t - colorMapPoints[a].p) / (colorMapPoints[a + 1].p - colorMapPoints[a].p), "CUBIC")
+                };
+            }
+        }
+        return "rgb(" + c.r + ", " + c.g + ", " + c.b + ")";
+    }
+
+    // Draw land colours to texture
+    ctxLand.fillStyle = "#ffffff";
+    ctxLand.fillRect(0, 0, landColor.width, landColor.height);
+
+    // Create the terrain mesh using the generated points
+    land = new THREE.Mesh(
+        new THREE.PolyhedronGeometry(landPoints, facesIndex, globe.radius, 1),
+        new THREE.MeshLambertMaterial({side: THREE.FrontSide, map: new THREE.CanvasTexture(landColor)})
+    );
+
+    land.material.map.center = {x: 0.5, y: 0.5};
+    land.material.map.rotation = Math.PI;
+    land.material.map.anisotropy = 4;
+    land.material.map.offset = {x: 0.5 / globe.gLongitudeRes, y: -0.5 / globe.gLatitudeRes};
+    land.position.copy({x: 0, y: 0, z: 0});
+    scene.add(land);
+
+    // Paint colours for visible land areas onto the texture
+    for (var a = 0; a < globe.gLongitudeRes; a++) {
+        for (var b = 0; b < globe.gLatitudeRes; b++) {
+            if (Math.abs(b / globe.gLatitudeRes - 0.5) < 0.3) {
+                var angleA = (a / globe.gLongitudeRes * 2) * Math.PI;
+                var angleB = (b / globe.gLatitudeRes - 0.5) * Math.PI;
+                var place = getAlt(angleA, angleB);
+                if (place.biome !== "ICE CAPS" && place.biome !== "ICE CAPS EDGE") {
+                    ctxLand.fillStyle = colorMap(place.alt);
+                    ctxLand.fillRect(a, b, 1, 1);
+                }
+            }
+        }
+    }
+    land.material.map.needsUpdate = true;
 }
 
-// Create a color map for land textures
-console.log("Coloring landscape...");
+// Initial globe creation
+generateGlobe();
 
-var colorMapPoints = [
-    {p: -1, r: 140, g: 140, b: 140},
-    {p: -0.4, r: 140, g: 140, b: 140},
-    {p: 0, r: 177, g: 180, b: 117},
-    {p: 0.05, r: 77, g: 223, b: 90},
-    {p: 0.3, r: 63, g: 191, b: 71},
-    {p: 0.4, r: 170, g: 170, b: 170},
-    {p: 0.45, r: 255, g: 255, b: 255},
-    {p: 1, r: 255, g: 255, b: 255}
-]
-
-function lerp (min, max, t, mode) {
-    if (mode === "CUBIC") {
-        t = -2 * t * t * t + 3 * t * t;
-    } else if (mode === "SINE") {
-        t = (1 - Math.cos(t * Math.PI)) / 2;
-    }
-    return min + t * (max - min);
-};
-
-function colorMap (t) {
-    var c = {r: 0, g: 0, b: 0};
-    for (var a = 0; a < colorMapPoints.length - 1; a++) {
-        if (t >= colorMapPoints[a].p && t < colorMapPoints[a + 1].p) {
-            c = {
-                r: lerp(colorMapPoints[a].r, colorMapPoints[a + 1].r, (t - colorMapPoints[a].p) / (colorMapPoints[a + 1].p - colorMapPoints[a].p), "CUBIC"),
-                g: lerp(colorMapPoints[a].g, colorMapPoints[a + 1].g, (t - colorMapPoints[a].p) / (colorMapPoints[a + 1].p - colorMapPoints[a].p), "CUBIC"),
-                b: lerp(colorMapPoints[a].b, colorMapPoints[a + 1].b, (t - colorMapPoints[a].p) / (colorMapPoints[a + 1].p - colorMapPoints[a].p), "CUBIC")
-            };
-        }
-    }
-    return "rgb(" + c.r + ", " + c.g + ", " + c.b + ")";
-};
-
-ctxLand.fillStyle = "#ffffff";
-ctxLand.fillRect(0, 0, landColor.width, landColor.height);
-
-// laaaaaggg
-var land = new THREE.Mesh(new THREE.PolyhedronGeometry(landPoints, facesIndex, globe.radius, 1), new THREE.MeshLambertMaterial({side: THREE.FrontSide, map: new THREE.CanvasTexture(landColor)}));
-
-land.material.map.center = {x: 0.5, y: 0.5};
-land.material.map.rotation = Math.PI;
-land.material.map.anisotropy = 4;
-land.material.map.offset = {x: 0.5 / globe.gLongitudeRes, y: -0.5 / globe.gLatitudeRes};
-land.position.copy({x: 0, y: 0, z: 0});
-scene.add(land);
-
-for (var a = 0; a < globe.gLongitudeRes; a++) {
-    for (var b = 0; b < globe.gLatitudeRes; b++) {
-        if (Math.abs(b / globe.gLatitudeRes - 0.5) < 0.3) {
-            var angleA = (a / globe.gLongitudeRes * 2) * Math.PI;
-            var angleB = (b / globe.gLatitudeRes - 0.5) * Math.PI;
-            var place = getAlt(angleA, angleB);
-            if (place.biome !== "ICE CAPS" && place.biome !== "ICE CAPS EDGE") {
-                ctxLand.fillStyle = colorMap(place.alt);
-                ctxLand.fillRect(a, b, 1, 1);
-            }
-        }
-    }
-}
-land.material.map.needsUpdate = true;
+// Rebuild the globe when the user clicks the Update button
+document.getElementById('applySettings').addEventListener('click', function() {
+    globe.heightScale = parseFloat(document.getElementById('heightScale').value);
+    globe.iceCapLatitude = parseFloat(document.getElementById('iceCapLat').value);
+    globe.iceCapLevel = parseFloat(document.getElementById('iceCapLvl').value);
+    globe.iceCapTransitionRange = parseFloat(document.getElementById('iceCapRange').value);
+    generateGlobe();
+});
 
 
 // Main render loop
