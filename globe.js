@@ -247,7 +247,9 @@ var firstPerson = false;
 var player = {
     position: new THREE.Vector3(),
     yaw: 0,
-    pitch: 0
+    pitch: 0,
+    // Camera height above the terrain surface
+    headHeight: 0.02
 };
 
 // Meshes for the ocean and terrain. These are recreated when settings change.
@@ -472,6 +474,7 @@ document.getElementById('applySettings').addEventListener('click', function() {
     globe.gLongitudeRes = parseInt(document.getElementById('texLonRes').value, 10);
     globe.noiseSeed = parseInt(document.getElementById('noiseSeed').value, 10);
     globe.heightScale = parseFloat(document.getElementById('heightScale').value);
+    player.headHeight = parseFloat(document.getElementById('headHeight').value);
     globe.iceCapLatitude = parseFloat(document.getElementById('iceCapLat').value);
     globe.iceCapLevel = parseFloat(document.getElementById('iceCapLvl').value);
     globe.iceCapTransitionRange = parseFloat(document.getElementById('iceCapRange').value);
@@ -489,7 +492,8 @@ document.getElementById('firstPersonToggle').addEventListener('change', function
     if (firstPerson) {
         // Initialize player position based on current orbit camera angles
         var alt = getAlt(cam.dx, -cam.dy).alt;
-        var r = globe.radius * (1 + globe.heightScale * alt) + 0.02;
+        // Position the player slightly above the surface based on headHeight
+        var r = globe.radius * (1 + globe.heightScale * alt) + player.headHeight;
         player.position.set(r * Math.sin(cam.dx) * Math.cos(-cam.dy),
                             -r * Math.sin(-cam.dy),
                             r * Math.cos(cam.dx) * Math.cos(-cam.dy));
@@ -517,13 +521,15 @@ function draw() {
     ocean.rotation.y += 0.0005;
 
     if (firstPerson) {
-        // Direction the player is facing in world space
-        var forward = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ'));
+        // Player orientation is defined relative to the local surface normal
         var up = player.position.clone().normalize();
-        // Project forward vector onto tangent plane
-        forward.addScaledVector(up, -forward.dot(up));
-        forward.normalize();
+        // Rotate the forward vector around the up axis by the yaw amount
+        var yawQuat = new THREE.Quaternion().setFromAxisAngle(up, player.yaw);
+        var forward = new THREE.Vector3(0, 0, -1).applyQuaternion(yawQuat);
+        // Tangent right vector used for strafing and pitching
         var right = new THREE.Vector3().crossVectors(forward, up).normalize();
+        // Apply pitch rotation around the right axis
+        forward.applyAxisAngle(right, player.pitch);
 
         var speed = 0.01 * globe.radius;
         if (keys[87]) player.position.addScaledVector(forward, speed); // W
@@ -535,7 +541,8 @@ function draw() {
         var lon = Math.atan2(player.position.z, player.position.x);
         var lat = Math.asin(player.position.y / player.position.length());
         var alt = getAlt(lon, lat).alt;
-        var r = globe.radius * (1 + globe.heightScale * alt) + 0.02;
+        // Maintain a constant offset above the surface
+        var r = globe.radius * (1 + globe.heightScale * alt) + player.headHeight;
         player.position.setLength(r);
 
         camera.position.copy(player.position);

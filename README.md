@@ -19,4 +19,5 @@ This starts a local server at `http://localhost:3000` that serves the project fi
 
  - **Rotate:** click and drag (or touch and drag) the canvas.
  - **Zoom:** use the mouse wheel to zoom the camera in and out.
- - **First Person:** enable the "First Person View" checkbox to walk on the globe. Use WASD to move and the mouse to look around.
+- **First Person:** enable the "First Person View" checkbox to walk on the globe. Use WASD to move and the mouse to look around.
+- **Head Height:** adjust the "Head Height" input in the settings panel to control how high the camera sits above the ground when in first person view.
