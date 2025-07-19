@@ -15,6 +15,10 @@ npm start
 
 This starts a local server at `http://localhost:3000` that serves the project files. Open that URL in your browser to view the globe.
 
+To run the server on a different port, set the `PORT` environment variable or
+pass the desired port as a command line argument. See
+[docs/port.md](docs/port.md) for details.
+
 ## Controls
 
  - **Rotate:** click and drag (or touch and drag) the canvas.
