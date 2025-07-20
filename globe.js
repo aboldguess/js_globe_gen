@@ -534,14 +534,27 @@ function draw() {
     ocean.rotation.y += 0.0005;
 
     if (firstPerson) {
-        // Player orientation is defined relative to the local surface normal
+        // Calculate orientation relative to the surface normal. The player
+        // "up" direction is simply the normalized position vector.
         var up = player.position.clone().normalize();
-        // Rotate the forward vector around the up axis by the yaw amount
+
+        // Choose a reference axis that is not aligned with the up vector so
+        // we can create a tangent direction on the surface. Using the global
+        // Y axis works for most cases; if the player is near the poles we fall
+        // back to the global X axis to avoid a degenerate cross product.
+        var refAxis = Math.abs(up.y) < 0.99 ? new THREE.Vector3(0, 1, 0)
+                                             : new THREE.Vector3(1, 0, 0);
+
+        // Start with a tangent forward vector and apply the yaw rotation
+        var forward = new THREE.Vector3().crossVectors(refAxis, up).normalize();
         var yawQuat = new THREE.Quaternion().setFromAxisAngle(up, player.yaw);
-        var forward = new THREE.Vector3(0, 0, -1).applyQuaternion(yawQuat);
-        // Tangent right vector used for strafing and pitching
+        forward.applyQuaternion(yawQuat);
+
+        // The right vector is perpendicular to both forward and up. This will
+        // always be well-defined because forward is guaranteed to be tangent.
         var right = new THREE.Vector3().crossVectors(forward, up).normalize();
-        // Apply pitch rotation around the right axis
+
+        // Apply pitch rotation around the right axis to look up or down
         forward.applyAxisAngle(right, player.pitch);
 
         var speed = 0.01 * globe.radius;
