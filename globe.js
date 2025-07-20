@@ -550,15 +550,18 @@ function draw() {
         // "up" direction is simply the normalized position vector.
         var up = player.position.clone().normalize();
 
-        // Choose a reference axis that is not aligned with the up vector so
-        // we can create a tangent direction on the surface. Using the global
-        // Y axis works for most cases; if the player is near the poles we fall
-        // back to the global X axis to avoid a degenerate cross product.
-        var refAxis = Math.abs(up.y) < 0.99 ? new THREE.Vector3(0, 1, 0)
-                                             : new THREE.Vector3(1, 0, 0);
+        // Choose a reference axis that isn't parallel to the surface normal.
+        // We start with the world Y axis since it works for most locations.
+        // If that results in a near-zero vector (which happens at the poles),
+        // fall back to the world X axis. This avoids a degenerate cross
+        // product so movement continues smoothly over the entire sphere.
+        var forward = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), up);
+        if (forward.lengthSq() < 1e-6) {
+            forward.crossVectors(new THREE.Vector3(1, 0, 0), up);
+        }
+        forward.normalize();
 
-        // Start with a tangent forward vector and apply the yaw rotation
-        var forward = new THREE.Vector3().crossVectors(refAxis, up).normalize();
+        // Apply the current yaw rotation around the up axis
         var yawQuat = new THREE.Quaternion().setFromAxisAngle(up, player.yaw);
         forward.applyQuaternion(yawQuat);
 
