@@ -552,19 +552,18 @@ function draw() {
         // "up" direction is simply the normalized position vector.
         var up = player.position.clone().normalize();
 
-        // Choose a reference axis that is guaranteed not to align with the
-        // surface normal. Normally the world Y axis works well, but near the
-        // poles it becomes parallel to `up` and the cross product degenerates.
-        // In that case we switch to the world X axis so forward remains valid
-        // and movement smoothly wraps around the pole.
-        var refAxis = new THREE.Vector3(0, 1, 0);
-        if (Math.abs(up.y) > 0.9) {
-            refAxis.set(1, 0, 0);
-        }
-        var forward = new THREE.Vector3().crossVectors(refAxis, up);
+        // Use the world Y axis to start building a tangent vector. This works
+        // for most latitudes but degenerates when "up" aligns with Y near the
+        // poles. If the resulting vector is too small, fall back to the world
+        // X axis which remains valid at the poles. A final fallback to the Z
+        // axis handles the extremely unlikely case of both being parallel due
+        // to floating point precision.
+        var forward = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), up);
         if (forward.lengthSq() < 1e-6) {
-            // Fallback for the unlikely case that both axes are parallel.
-            forward.crossVectors(new THREE.Vector3(0, 0, 1), up);
+            forward.crossVectors(new THREE.Vector3(1, 0, 0), up);
+            if (forward.lengthSq() < 1e-6) {
+                forward.crossVectors(new THREE.Vector3(0, 0, 1), up);
+            }
         }
         forward.normalize();
 
