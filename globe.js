@@ -118,6 +118,8 @@ canvas.addEventListener("pointermove", function(event) {
         // Update yaw/pitch while pointer is locked
         player.yaw -= event.movementX * 0.002;
         player.pitch -= event.movementY * 0.002;
+        // Keep yaw within [-pi, pi] so values don't grow unbounded
+        player.yaw = (player.yaw + Math.PI) % (Math.PI * 2) - Math.PI;
         // Limit looking too far up or down
         player.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, player.pitch));
     } else if (isDragging) {
@@ -550,14 +552,19 @@ function draw() {
         // "up" direction is simply the normalized position vector.
         var up = player.position.clone().normalize();
 
-        // Choose a reference axis that isn't parallel to the surface normal.
-        // We start with the world Y axis since it works for most locations.
-        // If that results in a near-zero vector (which happens at the poles),
-        // fall back to the world X axis. This avoids a degenerate cross
-        // product so movement continues smoothly over the entire sphere.
-        var forward = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), up);
+        // Choose a reference axis that is guaranteed not to align with the
+        // surface normal. Normally the world Y axis works well, but near the
+        // poles it becomes parallel to `up` and the cross product degenerates.
+        // In that case we switch to the world X axis so forward remains valid
+        // and movement smoothly wraps around the pole.
+        var refAxis = new THREE.Vector3(0, 1, 0);
+        if (Math.abs(up.y) > 0.9) {
+            refAxis.set(1, 0, 0);
+        }
+        var forward = new THREE.Vector3().crossVectors(refAxis, up);
         if (forward.lengthSq() < 1e-6) {
-            forward.crossVectors(new THREE.Vector3(1, 0, 0), up);
+            // Fallback for the unlikely case that both axes are parallel.
+            forward.crossVectors(new THREE.Vector3(0, 0, 1), up);
         }
         forward.normalize();
 
@@ -582,7 +589,9 @@ function draw() {
         var lon = Math.atan2(player.position.z, player.position.x);
         var lat = Math.asin(player.position.y / player.position.length());
         var alt = getAlt(lon, lat).alt;
-        // Maintain a constant offset above the surface
+        // Maintain a constant offset above the surface. Using setLength keeps
+        // the vector normalized so the player position naturally wraps around
+        // the sphere without worrying about coordinate singularities.
         var r = globe.radius * (1 + globe.heightScale * alt) + player.headHeight;
         player.position.setLength(r);
 
