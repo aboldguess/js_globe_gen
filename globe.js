@@ -256,6 +256,10 @@ var cam = {
 
 // Toggle for switching between orbit and first person camera modes
 var firstPerson = false;
+// Controls whether the globe automatically rotates each frame
+var autoRotate = true;
+// Keep the JS toggle state in sync with the checkbox's initial setting
+autoRotate = document.getElementById('autoRotateToggle').checked;
 // Stores player orientation and position when in first person mode
 var player = {
     position: new THREE.Vector3(),
@@ -518,6 +522,11 @@ document.getElementById('firstPersonToggle').addEventListener('change', function
     }
 });
 
+// Enable or disable automatic rotation when the checkbox changes
+document.getElementById('autoRotateToggle').addEventListener('change', function() {
+    autoRotate = this.checked;
+});
+
 
 // Main render loop
 function draw() {
@@ -530,8 +539,11 @@ function draw() {
     guiTexture.needsUpdate = true;
     */
 
-    land.rotation.y += 0.0005;
-    ocean.rotation.y += 0.0005;
+    // Slowly spin the world unless auto-rotation is disabled
+    if (autoRotate) {
+        land.rotation.y += 0.0005;
+        ocean.rotation.y += 0.0005;
+    }
 
     if (firstPerson) {
         // Calculate orientation relative to the surface normal. The player
