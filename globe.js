@@ -115,13 +115,21 @@ canvas.addEventListener("pointermove", function(event) {
     mouse.x = event.clientX;
     mouse.y = event.clientY;
     if (firstPerson && document.pointerLockElement === canvas) {
-        // Update yaw/pitch while pointer is locked
-        player.yaw -= event.movementX * 0.002;
-        player.pitch -= event.movementY * 0.002;
-        // Keep yaw within [-pi, pi] so values don't grow unbounded
-        player.yaw = (player.yaw + Math.PI) % (Math.PI * 2) - Math.PI;
-        // Limit looking too far up or down
-        player.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, player.pitch));
+        // Rotate the player quaternion based on mouse movement. Yaw is applied
+        // around the local Y axis (up) followed by pitch around the resulting
+        // X axis. Using quaternions avoids gimbal lock entirely.
+        var yawQuat = new THREE.Quaternion().setFromAxisAngle(
+            new THREE.Vector3(0, 1, 0),
+            -event.movementX * 0.002
+        );
+        player.rotation.premultiply(yawQuat);
+
+        var rightAxis = new THREE.Vector3(1, 0, 0).applyQuaternion(player.rotation);
+        var pitchQuat = new THREE.Quaternion().setFromAxisAngle(
+            rightAxis,
+            -event.movementY * 0.002
+        );
+        player.rotation.premultiply(pitchQuat);
     } else if (isDragging) {
         var deltaX = event.clientX - dragStart.x;
         var deltaY = event.clientY - dragStart.y;
@@ -281,8 +289,9 @@ autoRotate = document.getElementById('autoRotateToggle').checked;
 // Stores player orientation and position when in first person mode
 var player = {
     position: new THREE.Vector3(),
-    yaw: 0,
-    pitch: 0,
+    // Orientation stored as a quaternion to avoid gimbal lock when looking
+    // straight up or down.
+    rotation: new THREE.Quaternion(),
     // Camera height above the terrain surface
     headHeight: 0.02
 };
@@ -539,8 +548,13 @@ document.getElementById('firstPersonToggle').addEventListener('change', function
             r * Math.sin(lat),
             r * Math.cos(lon) * Math.cos(lat)
         );
-        player.yaw = lon;
-        player.pitch = lat;
+        // Align the player quaternion with the current orbit camera so that the
+        // view transitions seamlessly when switching modes.
+        var up = player.position.clone().normalize();
+        var alignQuat = new THREE.Quaternion().setFromUnitVectors(
+            new THREE.Vector3(0, 1, 0), up
+        );
+        player.rotation.copy(alignQuat.clone().invert().multiply(cam.rotation));
         canvas.requestPointerLock();
     } else {
         document.exitPointerLock();
@@ -575,28 +589,16 @@ function draw() {
         // "up" direction is simply the normalized position vector.
         var up = player.position.clone().normalize();
 
-        // Build a stable local tangent basis. "East" is the cross product of
-        // the world Y axis and the local up vector. Near the poles this vector
-        // becomes degenerate, so we fall back to using the world Z axis.
-        var east = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), up);
-        if (east.lengthSq() < 1e-6) {
-            east.crossVectors(new THREE.Vector3(0, 0, 1), up);
-        }
-        east.normalize();
+        // Compute orientation aligned with the local up direction. The player
+        // rotation quaternion is relative to a tangent basis where the Y axis
+        // points up from the surface.
+        var alignQuat = new THREE.Quaternion().setFromUnitVectors(
+            new THREE.Vector3(0, 1, 0), up
+        );
+        var orientation = alignQuat.clone().multiply(player.rotation);
 
-        // "North" completes the tangent basis. It is guaranteed to be
-        // orthogonal to both up and east.
-        var north = new THREE.Vector3().crossVectors(up, east).normalize();
-
-        // Start facing north then rotate around the up axis by the current yaw
-        // angle. This avoids discontinuities when crossing over the poles.
-        var forward = north.clone().applyAxisAngle(up, player.yaw);
-
-        // The right vector is perpendicular to both forward and up.
-        var right = new THREE.Vector3().crossVectors(forward, up).normalize();
-
-        // Apply pitch rotation around the right axis to look up or down.
-        forward.applyAxisAngle(right, player.pitch);
+        var forward = new THREE.Vector3(0, 0, -1).applyQuaternion(orientation);
+        var right = new THREE.Vector3(1, 0, 0).applyQuaternion(orientation);
 
         var speed = 0.01 * globe.radius;
         if (keys[87]) player.position.addScaledVector(forward, speed); // W
@@ -615,8 +617,7 @@ function draw() {
         player.position.setLength(r);
 
         camera.position.copy(player.position);
-        camera.up.copy(up);
-        camera.lookAt(player.position.clone().add(forward));
+        camera.setRotationFromQuaternion(orientation);
     } else {
         // Apply the quaternion-based orbit orientation to the camera.
         camera.setRotationFromQuaternion(cam.rotation);
