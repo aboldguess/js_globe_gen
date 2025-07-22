@@ -552,30 +552,27 @@ function draw() {
         // "up" direction is simply the normalized position vector.
         var up = player.position.clone().normalize();
 
-        // Use the world Y axis to start building a tangent vector. This works
-        // for most latitudes but degenerates when "up" aligns with Y near the
-        // poles. If the resulting vector is too small, fall back to the world
-        // X axis which remains valid at the poles. A final fallback to the Z
-        // axis handles the extremely unlikely case of both being parallel due
-        // to floating point precision.
-        var forward = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), up);
-        if (forward.lengthSq() < 1e-6) {
-            forward.crossVectors(new THREE.Vector3(1, 0, 0), up);
-            if (forward.lengthSq() < 1e-6) {
-                forward.crossVectors(new THREE.Vector3(0, 0, 1), up);
-            }
+        // Build a stable local tangent basis. "East" is the cross product of
+        // the world Y axis and the local up vector. Near the poles this vector
+        // becomes degenerate, so we fall back to using the world Z axis.
+        var east = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), up);
+        if (east.lengthSq() < 1e-6) {
+            east.crossVectors(new THREE.Vector3(0, 0, 1), up);
         }
-        forward.normalize();
+        east.normalize();
 
-        // Apply the current yaw rotation around the up axis
-        var yawQuat = new THREE.Quaternion().setFromAxisAngle(up, player.yaw);
-        forward.applyQuaternion(yawQuat);
+        // "North" completes the tangent basis. It is guaranteed to be
+        // orthogonal to both up and east.
+        var north = new THREE.Vector3().crossVectors(up, east).normalize();
 
-        // The right vector is perpendicular to both forward and up. This will
-        // always be well-defined because forward is guaranteed to be tangent.
+        // Start facing north then rotate around the up axis by the current yaw
+        // angle. This avoids discontinuities when crossing over the poles.
+        var forward = north.clone().applyAxisAngle(up, player.yaw);
+
+        // The right vector is perpendicular to both forward and up.
         var right = new THREE.Vector3().crossVectors(forward, up).normalize();
 
-        // Apply pitch rotation around the right axis to look up or down
+        // Apply pitch rotation around the right axis to look up or down.
         forward.applyAxisAngle(right, player.pitch);
 
         var speed = 0.01 * globe.radius;
