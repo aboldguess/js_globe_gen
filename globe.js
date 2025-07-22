@@ -137,12 +137,15 @@ canvas.addEventListener("pointermove", function(event) {
     } else if (isDragging) {
         var deltaX = event.clientX - dragStart.x;
         var deltaY = event.clientY - dragStart.y;
-        // Convert mouse motion into incremental rotations. We first rotate
-        // around the world Y axis (yaw) and then around the camera's local
-        // X axis (pitch). Using quaternions prevents gimbal lock when the
-        // camera pitch approaches +-90 degrees.
+        // Convert mouse motion into incremental rotations. Yaw is applied
+        // around the camera's current up vector rather than the fixed world
+        // Y axis. Using the camera's local up direction keeps yaw working
+        // even when the camera is pitched straight up or down, preventing
+        // gimbal lock. Pitch is then applied around the resulting right
+        // vector (camera's local X axis).
+        var yawAxis = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.rotation);
         var yawQuat = new THREE.Quaternion().setFromAxisAngle(
-            new THREE.Vector3(0, 1, 0),
+            yawAxis,
             -(deltaX / canvas.clientWidth) * Math.PI
         );
         cam.rotation.premultiply(yawQuat);
@@ -154,6 +157,8 @@ canvas.addEventListener("pointermove", function(event) {
             -(deltaY / canvas.clientHeight) * Math.PI
         );
         cam.rotation.premultiply(pitchQuat);
+        // Normalize to prevent numerical drift from successive quaternion multiplications
+        cam.rotation.normalize();
 
         dragStart.x = event.clientX;
         dragStart.y = event.clientY;
