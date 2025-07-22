@@ -127,6 +127,9 @@ canvas.addEventListener("pointermove", function(event) {
             -event.movementX * 0.002
         );
         player.rotation.premultiply(yawQuat);
+        // Normalize to keep the quaternion from drifting and help avoid gimbal
+        // lock when many rotations accumulate
+        player.rotation.normalize();
 
         var rightAxis = new THREE.Vector3(1, 0, 0).applyQuaternion(player.rotation);
         var pitchQuat = new THREE.Quaternion().setFromAxisAngle(
@@ -134,6 +137,8 @@ canvas.addEventListener("pointermove", function(event) {
             -event.movementY * 0.002
         );
         player.rotation.premultiply(pitchQuat);
+        // Normalize after applying pitch as well to keep rotation stable
+        player.rotation.normalize();
     } else if (isDragging) {
         var deltaX = event.clientX - dragStart.x;
         var deltaY = event.clientY - dragStart.y;
@@ -149,6 +154,8 @@ canvas.addEventListener("pointermove", function(event) {
             -(deltaX / canvas.clientWidth) * Math.PI
         );
         cam.rotation.premultiply(yawQuat);
+        // Normalize to keep the camera quaternion stable and avoid drifting
+        cam.rotation.normalize();
 
         // The right vector after applying yaw becomes the axis for pitch.
         var rightAxis = new THREE.Vector3(1, 0, 0).applyQuaternion(cam.rotation);
@@ -157,7 +164,7 @@ canvas.addEventListener("pointermove", function(event) {
             -(deltaY / canvas.clientHeight) * Math.PI
         );
         cam.rotation.premultiply(pitchQuat);
-        // Normalize to prevent numerical drift from successive quaternion multiplications
+        // Normalize again after pitch so accumulated rotations remain orthogonal
         cam.rotation.normalize();
 
         dragStart.x = event.clientX;
