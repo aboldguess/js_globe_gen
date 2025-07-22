@@ -539,11 +539,13 @@ document.getElementById('applySettings').addEventListener('click', function() {
 document.getElementById('firstPersonToggle').addEventListener('change', function() {
     firstPerson = this.checked;
     if (firstPerson) {
-        // Convert the current orbit orientation to spherical coordinates so
-        // the player spawns at the same location when switching modes.
-        var e = new THREE.Euler().setFromQuaternion(cam.rotation, 'YXZ');
-        var lon = e.y;           // rotation around the Y axis
-        var lat = -e.x;          // latitude measured from the equator
+        // Derive the player's spawn orientation from the camera quaternion.
+        // Computing the forward vector directly from the quaternion keeps the
+        // math in vector space and avoids gimbal lock issues that Euler angles
+        // can suffer from when looking straight up or down.
+        var forward = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.rotation);
+        var lat = Math.asin(forward.y);            // latitude from forward vector
+        var lon = Math.atan2(forward.x, forward.z); // longitude around the Y axis
         var alt = getAlt(lon, lat).alt;
 
         // Position the player slightly above the surface based on headHeight.
