@@ -125,9 +125,24 @@ canvas.addEventListener("pointermove", function(event) {
     } else if (isDragging) {
         var deltaX = event.clientX - dragStart.x;
         var deltaY = event.clientY - dragStart.y;
-        // Horizontal drag rotates around the Y axis, vertical drag around X
-        cam.dx -= (deltaX / canvas.clientWidth) * Math.PI;
-        cam.dy -= (deltaY / canvas.clientHeight) * Math.PI;
+        // Convert mouse motion into incremental rotations. We first rotate
+        // around the world Y axis (yaw) and then around the camera's local
+        // X axis (pitch). Using quaternions prevents gimbal lock when the
+        // camera pitch approaches +-90 degrees.
+        var yawQuat = new THREE.Quaternion().setFromAxisAngle(
+            new THREE.Vector3(0, 1, 0),
+            -(deltaX / canvas.clientWidth) * Math.PI
+        );
+        cam.rotation.premultiply(yawQuat);
+
+        // The right vector after applying yaw becomes the axis for pitch.
+        var rightAxis = new THREE.Vector3(1, 0, 0).applyQuaternion(cam.rotation);
+        var pitchQuat = new THREE.Quaternion().setFromAxisAngle(
+            rightAxis,
+            -(deltaY / canvas.clientHeight) * Math.PI
+        );
+        cam.rotation.premultiply(pitchQuat);
+
         dragStart.x = event.clientX;
         dragStart.y = event.clientY;
     }
@@ -248,12 +263,13 @@ for (var a = 0; a < globe.longitudeRes; a++) {
 }
 // Camera settings
 
+// Camera parameters used for the orbit view.
+// `rotation` stores the current orientation as a quaternion so we can rotate
+// around arbitrary axes without running into gimbal lock when looking straight
+// up or down.
 var cam = {
-    dx: 0,
-    dy: 0,
-    dz: 0,
     distance: globe.radius * 3,
-    rotation: new THREE.Quaternion(0, 0, 0, 0)
+    rotation: new THREE.Quaternion()
 };
 
 // Toggle for switching between orbit and first person camera modes
@@ -509,15 +525,22 @@ document.getElementById('applySettings').addEventListener('click', function() {
 document.getElementById('firstPersonToggle').addEventListener('change', function() {
     firstPerson = this.checked;
     if (firstPerson) {
-        // Initialize player position based on current orbit camera angles
-        var alt = getAlt(cam.dx, -cam.dy).alt;
-        // Position the player slightly above the surface based on headHeight
+        // Convert the current orbit orientation to spherical coordinates so
+        // the player spawns at the same location when switching modes.
+        var e = new THREE.Euler().setFromQuaternion(cam.rotation, 'YXZ');
+        var lon = e.y;           // rotation around the Y axis
+        var lat = -e.x;          // latitude measured from the equator
+        var alt = getAlt(lon, lat).alt;
+
+        // Position the player slightly above the surface based on headHeight.
         var r = globe.radius * (1 + globe.heightScale * alt) + player.headHeight;
-        player.position.set(r * Math.sin(cam.dx) * Math.cos(-cam.dy),
-                            -r * Math.sin(-cam.dy),
-                            r * Math.cos(cam.dx) * Math.cos(-cam.dy));
-        player.yaw = cam.dx;
-        player.pitch = -cam.dy;
+        player.position.set(
+            r * Math.sin(lon) * Math.cos(lat),
+            r * Math.sin(lat),
+            r * Math.cos(lon) * Math.cos(lat)
+        );
+        player.yaw = lon;
+        player.pitch = lat;
         canvas.requestPointerLock();
     } else {
         document.exitPointerLock();
@@ -595,18 +618,15 @@ function draw() {
         camera.up.copy(up);
         camera.lookAt(player.position.clone().add(forward));
     } else {
-        // Convert the current camera angles into a quaternion for Three.js
-        cam.rotation.w = Math.cos(cam.dx / 2) * Math.cos(cam.dy / 2);
-        cam.rotation.z = -Math.sin(cam.dx / 2) * Math.sin(cam.dy / 2);
-        cam.rotation.x = Math.cos(cam.dx / 2) * Math.sin(cam.dy / 2);
-        cam.rotation.y = Math.sin(cam.dx / 2) * Math.cos(cam.dy / 2);
-
+        // Apply the quaternion-based orbit orientation to the camera.
         camera.setRotationFromQuaternion(cam.rotation);
-        camera.position.set(
-            cam.distance * Math.sin(cam.dx) * Math.cos(cam.dy),
-            -cam.distance * Math.sin(cam.dy),
-            cam.distance * Math.cos(cam.dx) * Math.cos(cam.dy)
-        );
+
+        // The camera orbits the origin at a fixed distance. Rotating the
+        // default offset vector by the quaternion yields the correct position
+        // regardless of orientation.
+        var offset = new THREE.Vector3(0, 0, cam.distance);
+        offset.applyQuaternion(cam.rotation);
+        camera.position.copy(offset);
     }
 
     renderer.render(scene, camera);
@@ -637,15 +657,9 @@ ctx.fillText("Max Altitude: " + getMaxAlt().toFixed(3), 20, gui.height - 20);
 guiTexture.needsUpdate = true;
 */
 
-/*
-    land.setRotationFromQuaternion({
-        w: Math.sin(cam.dx / 2) * Math.cos(cam.dy / 2),
-        x: Math.cos(cam.dx / 2) * Math.sin(cam.dy / 2),
-        y: Math.cos(cam.dx / 2) * Math.cos(cam.dy / 2),
-        z: -Math.sin(cam.dx / 2) * Math.sin(cam.dy / 2)
-    });
-
-    light.position.set(Math.cos(cam.dx) * Math.cos(cam.dy), -Math.sin(cam.dy), Math.sin(cam.dx) * Math.cos(cam.dy));
+/* Example of applying the camera quaternion to other objects
+   land.setRotationFromQuaternion(cam.rotation);
+   light.position.copy(new THREE.Vector3(0, 0, 1).applyQuaternion(cam.rotation));
 */
 
 
