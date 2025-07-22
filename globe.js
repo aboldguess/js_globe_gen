@@ -118,8 +118,13 @@ canvas.addEventListener("pointermove", function(event) {
         // Rotate the player quaternion based on mouse movement. Yaw is applied
         // around the local Y axis (up) followed by pitch around the resulting
         // X axis. Using quaternions avoids gimbal lock entirely.
+        // Yaw is rotated around the player's up direction (local surface normal)
+        // so looking around works correctly even at the poles and avoids
+        // gimbal lock. The up axis is derived from the player's current
+        // position on the globe and normalized.
+        var upAxis = player.position.clone().normalize();
         var yawQuat = new THREE.Quaternion().setFromAxisAngle(
-            new THREE.Vector3(0, 1, 0),
+            upAxis,
             -event.movementX * 0.002
         );
         player.rotation.premultiply(yawQuat);
