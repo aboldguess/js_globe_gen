@@ -13,7 +13,7 @@ npm install
 npm start
 ```
 
-This starts a local server at `http://localhost:3000` that serves the project files. Open that URL in your browser to view the globe.
+When the server starts it automatically opens your default browser to the correct URL. It attempts to use port `3000` by default but will move to the next available port if `3000` is already in use.
 
 To run the server on a different port, set the `PORT` environment variable or
 pass the desired port as a command line argument. See
