@@ -1,7 +1,8 @@
 # Running the Server on a Custom Port
 
-The server listens on port `3000` by default. You can override this using either
-an environment variable or a command line argument.
+The server listens on port `3000` by default and will automatically move to the
+next available port if that one is already in use. You can override the starting
+port using either an environment variable or a command line argument.
 
 ## Using an Environment Variable
 
@@ -28,4 +29,5 @@ npm start 5000
 
 The server will check the command line argument first. If no argument is given,
 it falls back to the `PORT` environment variable and finally to the default
-`3000`.
+`3000`. Whichever port it ends up using, it will open your browser to that
+address once the server is ready.
